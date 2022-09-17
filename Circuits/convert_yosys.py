@@ -91,67 +91,68 @@ if args.top_module == None:
 
 if not args.skip_yosys:
     # Make sure yosys is installed and in the path
-    try:
-        with subprocess.Popen(["yosys", "-V"], stdout=subprocess.PIPE) as proc:
-            proc.wait()
-            version = re.findall(r"Yosys (\d+\.\d+)", str(proc.stdout.read()))
-            if len(version) == 1: 
-                logging.info("Using Yosys version %s" % version[0])
-            else:
-                raise Exception("Yosys version not found.")
-    except Exception as e:
-        logging.error(e)
-        logging.error("Yosys not found. Please install it (http://www.clifford.at/yosys/download.html)")
-        exit()
+    a = subprocess.Popen(["yosys", "-V"], stdout=subprocess.PIPE)
+    a.wait()
+    print(a.stdout.read())
+    # try:
+        # with subprocess.Popen(["yosys", "-V"], stdout=subprocess.PIPE) as proc:
+    proc = subprocess.Popen(["yosys", "-V"], stdout=subprocess.PIPE)
+    proc.wait()
+    version = re.findall(r"Yosys (\d+\.\d+)", str(proc.stdout.read()))
+    if len(version) == 1: 
+        logging.info("Using Yosys version %s" % version[0])
+    
+    # except Exception as e:
+    #     logging.error(e)
+    #     logging.error("Yosys not found. Please install it (http://www.clifford.at/yosys/download.html)")
+    #     exit()
     # Process the design
-    try:
-        pipe_stdout = subprocess.PIPE if not args.verbose else None
-        with subprocess.Popen(["yosys"], stdin = subprocess.PIPE, stdout = pipe_stdout) as proc:
-            # Please feel free to change the commands or use -sy to manually run Yosys
-            if args.lang == 'verilog':
-                read_option = "-sv"
-            else:
-                read_option = "-vhdl"
-            input_files = [args.input_file]
-            input_files += args.add_file if args.add_file else []
-            for f in input_files: 
-                proc.stdin.write(("read %s %s\n" % (read_option, f)).encode())
-            proc.stdin.write(("synth -top %s\n" % args.top_module).encode())
-            # Needed to reduce the gates to ones supported by the Bristol format
-            proc.stdin.write(b"proc\n")
-            proc.stdin.write(b"opt\n")
-            proc.stdin.write(b"fsm\n")
-            proc.stdin.write(b"flatten\n")
-            proc.stdin.write(b"memory\n")
-            proc.stdin.write(b"opt\n")
-            proc.stdin.write(b"techmap\n")
-            proc.stdin.write(b"opt\n")
-            proc.stdin.write(b"wreduce\n")
-            # This can be slow
-            #proc.stdin.write(b"freduce -vv\n")
-            proc.stdin.write(b"clean\n")
-            proc.stdin.write(b"abc -g AND\n")
-            proc.stdin.write(b"opt_reduce -fine\n")
-            for i in range(5):
-                proc.stdin.write(b"abc -g XOR,AND\n")
-                proc.stdin.write(b"opt -fine\n")
-                proc.stdin.write(b"clean\n")
-                proc.stdin.write(b"flatten\n")
-            proc.stdin.write(b"torder\n")
-            # Note that -nohex and -noattr are required
-            proc.stdin.write(("write_verilog -nohex -noattr %s.yosys.v\n" % args.input_file).encode())
-            out = proc.communicate(input=b"exit")
-            if not args.verbose:
-                pstdout = out[0].decode("utf-8")
-                logging.info(pstdout)
-                errors = re.findall(r"\nERROR: ([^\n]*)\n", pstdout)
-                for error in errors:
-                    logging.error(error)
-                    if args.lang == 'vhdl' and 'Verific' in error:
-                        logging.error("Note that Yosys needs to be built with Verific support. You could also try https://github.com/pliu6/vhd2vl.git to convert your VHDL code to Verilog.")
-    except Exception as e:
-        logging.error(e)
-        exit()
+
+    pipe_stdout = subprocess.PIPE if not args.verbose else None
+    proc = subprocess.Popen(["yosys"], stdin = subprocess.PIPE, stdout = pipe_stdout)
+        # Please feel free to change the commands or use -sy to manually run Yosys
+    if args.lang == 'verilog':
+        read_option = "-sv"
+    else:
+        read_option = "-vhdl"
+    input_files = [args.input_file]
+    input_files += args.add_file if args.add_file else []
+    for f in input_files: 
+        proc.stdin.write(("read %s %s\n" % (read_option, f)).encode())
+    proc.stdin.write(("synth -top %s\n" % args.top_module).encode())
+    # Needed to reduce the gates to ones supported by the Bristol format
+    proc.stdin.write(b"proc\n")
+    proc.stdin.write(b"opt\n")
+    proc.stdin.write(b"fsm\n")
+    proc.stdin.write(b"flatten\n")
+    proc.stdin.write(b"memory\n")
+    proc.stdin.write(b"opt\n")
+    proc.stdin.write(b"techmap\n")
+    proc.stdin.write(b"opt\n")
+    proc.stdin.write(b"wreduce\n")
+    # This can be slow
+    #proc.stdin.write(b"freduce -vv\n")
+    proc.stdin.write(b"clean\n")
+    proc.stdin.write(b"abc -g AND\n")
+    proc.stdin.write(b"opt_reduce -fine\n")
+    for i in range(5):
+        proc.stdin.write(b"abc -g XOR,AND\n")
+        proc.stdin.write(b"opt -fine\n")
+        proc.stdin.write(b"clean\n")
+        proc.stdin.write(b"flatten\n")
+    proc.stdin.write(b"torder\n")
+    # Note that -nohex and -noattr are required
+    proc.stdin.write(("write_verilog -nohex -noattr %s.yosys.v\n" % args.input_file).encode())
+    out = proc.communicate(input=b"exit")
+    if not args.verbose:
+        pstdout = out[0].decode("utf-8")
+        logging.info(pstdout)
+        errors = re.findall(r"\nERROR: ([^\n]*)\n", pstdout)
+        for error in errors:
+            logging.error(error)
+            if args.lang == 'vhdl' and 'Verific' in error:
+                logging.error("Note that Yosys needs to be built with Verific support. You could also try https://github.com/pliu6/vhd2vl.git to convert your VHDL code to Verilog.")
+
 
 # Convert yosys verilog output to Bristol format
 # Note only one module should be here.
